@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Pre-check Docker') {
+            steps {
+                script {
+                    def d1 = sh(script: 'docker --version', returnStatus: true)
+                    if (d1 != 0) {
+                        error "Docker is NOT installed on Jenkins agent."
+                    }
+                    def d2 = sh(script: 'docker info', returnStatus: true)
+                    if (d2 != 0) {
+                        error "Docker daemon is NOT running."
+                    }
+                    echo "Docker is installed and running."
+                }
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/ShivaniShastry/cloudmint-docker-ci.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                docker build -t cloudmint-svc:2 .
+                '''
+            }
+        }
+
+        stage('Run Container') {
+            steps {
+                sh '''
+                docker rm -f cloudmint-svc || true
+                docker run -d --name cloudmint-svc -p 12032:12032 cloudmint-svc:2
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "CloudMint Docker CI pipeline successful!"
+        }
+        failure {
+            echo "Pipeline failed. Check console logs."
+        }
+    }
+}
